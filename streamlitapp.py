@@ -2,67 +2,48 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
-import torch
-import torch.nn as nn
-import plotly.graph_objects as go
+from sklearn.neural_network import MLPClassifier
+import plotly.express as px
 
-# Model definition
-class QuantumTunnelingModel(nn.Module):
-    def __init__(self, input_size=1):
-        super(QuantumTunnelingModel, self).__init__()
-        self.network = nn.Sequential(
-            nn.Linear(input_size, 32),
-            nn.ReLU(),
-            nn.Linear(32, 16),
-            nn.ReLU(),
-            nn.Linear(16, 1),
-            nn.Sigmoid()
-        )
-    
-    def forward(self, x):
-        return self.network(x)
-    
-    def predict(self, x):
-        self.eval()
-        with torch.no_grad():
-            x = torch.FloatTensor(x).reshape(-1, 1)
-            return self.forward(x)
-
-# Data processing
-class DataProcessor:
+class QuantumTunnelingPredictor:
     def __init__(self):
         self.scaler = StandardScaler()
-    
+        self.model = MLPClassifier(
+            hidden_layer_sizes=(32, 16),
+            activation='relu',
+            random_state=42
+        )
+        
     def process_data(self, data):
         if isinstance(data, pd.DataFrame):
             values = data['ldr_value'].values.reshape(-1, 1)
         else:
             values = np.array(data).reshape(-1, 1)
-        scaled_data = self.scaler.fit_transform(values)
-        return torch.FloatTensor(scaled_data)
+        return self.scaler.fit_transform(values)
+    
+    def predict(self, X):
+        # Returns probabilities between 0 and 1
+        return self.model.predict_proba(X)[:, 1]
 
 def create_sample_data():
     num_samples = st.sidebar.slider("Number of samples", 10, 100, 50)
     noise_level = st.sidebar.slider("Noise level", 0.0, 1.0, 0.2)
     x = np.linspace(0, 10, num_samples)
     y = np.sin(x) + noise_level * np.random.randn(num_samples)
-    df = pd.DataFrame({
+    return pd.DataFrame({
         'ldr_value': y,
-        'tunneling': (y > 0).astype(float)
+        'tunneling': (y > 0).astype(int)
     })
-    return df
 
 def main():
     st.title("Quantum Tunneling Predictor")
     st.write("""
-    ### Predict quantum tunneling probability using LDR sensor data
-    Upload your data or use the sample generator to test the model.
+    ### LDR-based Quantum Tunneling Probability Prediction
+    Use the sidebar to select your data source and control parameters.
     """)
     
-    model = QuantumTunnelingModel()
-    processor = DataProcessor()
+    predictor = QuantumTunnelingPredictor()
     
-    # Sidebar
     st.sidebar.title("Controls")
     data_source = st.sidebar.radio(
         "Select Data Source",
@@ -71,15 +52,17 @@ def main():
     
     if data_source == "Sample Data":
         df = create_sample_data()
-        st.write("Sample Data Preview:", df.head())
-        processed_data = processor.process_data(df)
-        predictions = model.predict(processed_data)
+        st.write("Sample Data Preview:")
+        st.dataframe(df.head())
         
-        # Plot
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(y=df['ldr_value'].values, name='LDR Values'))
-        fig.add_trace(go.Scatter(y=predictions.numpy().flatten(), name='Predictions'))
-        fig.update_layout(title='Predictions vs Actual Values')
+        processed_data = predictor.process_data(df)
+        predictor.model.fit(processed_data, df['tunneling'])
+        predictions = predictor.predict(processed_data)
+        
+        # Plotting
+        df['predictions'] = predictions
+        fig = px.line(df, y=['ldr_value', 'predictions'], 
+                     title='LDR Values and Tunneling Predictions')
         st.plotly_chart(fig)
         
     elif data_source == "Upload CSV":
@@ -90,24 +73,52 @@ def main():
                 if 'ldr_value' not in df.columns:
                     st.error("CSV must contain 'ldr_value' column")
                 else:
-                    processed_data = processor.process_data(df)
-                    predictions = model.predict(processed_data)
-                    st.write("Predictions:", predictions.numpy().flatten())
+                    st.write("Data Preview:")
+                    st.dataframe(df.head())
+                    
+                    processed_data = predictor.process_data(df)
+                    if 'tunneling' in df.columns:
+                        predictor.model.fit(processed_data, df['tunneling'])
+                    predictions = predictor.predict(processed_data)
+                    
+                    results_df = pd.DataFrame({
+                        'LDR Value': df['ldr_value'],
+                        'Tunneling Probability': predictions
+                    })
+                    st.write("Predictions:")
+                    st.dataframe(results_df)
+                    
             except Exception as e:
-                st.error(f"Error: {str(e)}")
+                st.error(f"Error processing file: {str(e)}")
                 
     else:  # Single Value
         value = st.number_input("Enter LDR value:", -10.0, 10.0, 0.0)
         if st.button("Predict"):
-            processed_value = processor.process_data([[value]])
-            prediction = model.predict(processed_value)
+            # Create sample data for initial training
+            train_df = create_sample_data()
+            processed_train = predictor.process_data(train_df)
+            predictor.model.fit(processed_train, train_df['tunneling'])
             
-            # Gauge chart
+            # Make prediction
+            processed_value = predictor.process_data([[value]])
+            prediction = predictor.predict([processed_value[0]])[0]
+            
+            st.write(f"Tunneling Probability: {prediction:.2%}")
+            
+            # Create gauge chart using plotly
+            import plotly.graph_objects as go
             fig = go.Figure(go.Indicator(
                 mode="gauge+number",
-                value=float(prediction.item() * 100),
+                value=prediction * 100,
                 title={'text': "Tunneling Probability (%)"},
-                gauge={'axis': {'range': [0, 100]}}
+                gauge={
+                    'axis': {'range': [0, 100]},
+                    'bar': {'color': "darkblue"},
+                    'steps': [
+                        {'range': [0, 50], 'color': "lightgray"},
+                        {'range': [50, 100], 'color': "gray"}
+                    ]
+                }
             ))
             st.plotly_chart(fig)
 
