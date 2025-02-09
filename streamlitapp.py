@@ -1,82 +1,66 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
-from sklearn.preprocessing import StandardScaler
-from sklearn.neural_network import MLPClassifier
+import math
+import random
 
-class QuantumTunnelingPredictor:
-    def __init__(self):
-        self.scaler = StandardScaler()
-        self.model = MLPClassifier(
-            hidden_layer_sizes=(32, 16),
-            activation='relu',
-            random_state=42
-        )
-        
-    def process_data(self, data):
-        if isinstance(data, pd.DataFrame):
-            values = data['ldr_value'].values.reshape(-1, 1)
-        else:
-            values = np.array(data).reshape(-1, 1)
-        return self.scaler.fit_transform(values)
-    
-    def predict(self, X):
-        return self.model.predict_proba(X)[:, 1]
-
-def create_sample_data():
-    num_samples = st.sidebar.slider("Number of samples", 10, 100, 50)
-    noise_level = st.sidebar.slider("Noise level", 0.0, 1.0, 0.2)
-    x = np.linspace(0, 10, num_samples)
-    y = np.sin(x) + noise_level * np.random.randn(num_samples)
-    return pd.DataFrame({
-        'ldr_value': y,
-        'tunneling': (y > 0).astype(int)
-    })
+def simulate_tunneling(ldr_value):
+    # Simple simulation based on a sine wave and the input value
+    base_probability = (math.sin(ldr_value) + 1) / 2  # Returns value between 0 and 1
+    # Add some random noise
+    noise = random.uniform(-0.1, 0.1)
+    probability = max(0, min(1, base_probability + noise))  # Ensure between 0 and 1
+    return probability
 
 def main():
-    st.title("Quantum Tunneling Predictor")
+    st.title("Quantum Tunneling Simulator")
     st.write("""
-    ### LDR-based Quantum Tunneling Probability Prediction
-    Use the sidebar to select your data source and control parameters.
+    ### Simple LDR-based Quantum Tunneling Demonstration
+    This is a basic simulation of quantum tunneling probability based on LDR values.
     """)
     
-    predictor = QuantumTunnelingPredictor()
+    # Sidebar for mode selection
+    mode = st.sidebar.radio("Select Mode", ["Single Value", "Real-time Simulation"])
     
-    st.sidebar.title("Controls")
-    data_source = st.sidebar.radio(
-        "Select Data Source",
-        ["Sample Data", "Single Value"]
-    )
+    if mode == "Single Value":
+        # Single value prediction
+        ldr_value = st.slider("Enter LDR value", 0.0, 10.0, 5.0)
+        if st.button("Calculate Probability"):
+            probability = simulate_tunneling(ldr_value)
+            
+            # Display result
+            st.write(f"Tunneling Probability: {probability:.2%}")
+            st.progress(probability)
+            
+            # Add some context
+            if probability > 0.7:
+                st.success("High probability of tunneling!")
+            elif probability > 0.3:
+                st.info("Moderate probability of tunneling")
+            else:
+                st.warning("Low probability of tunneling")
     
-    if data_source == "Sample Data":
-        df = create_sample_data()
-        st.write("Sample Data Preview:")
-        st.dataframe(df.head())
+    else:
+        # Real-time simulation
+        st.write("Simulating real-time LDR readings...")
+        import time
         
-        processed_data = predictor.process_data(df)
-        predictor.model.fit(processed_data, df['tunneling'])
-        predictions = predictor.predict(processed_data)
+        # Create placeholder for updating values
+        value_placeholder = st.empty()
+        prob_placeholder = st.empty()
+        progress_placeholder = st.empty()
         
-        # Using streamlit's native plotting
-        df['predictions'] = predictions
-        st.line_chart(df[['ldr_value', 'predictions']])
-                
-    else:  # Single Value
-        value = st.number_input("Enter LDR value:", -10.0, 10.0, 0.0)
-        if st.button("Predict"):
-            # Create sample data for initial training
-            train_df = create_sample_data()
-            processed_train = predictor.process_data(train_df)
-            predictor.model.fit(processed_train, train_df['tunneling'])
+        # Simulate 5 readings
+        for i in range(5):
+            ldr_value = random.uniform(0, 10)
+            probability = simulate_tunneling(ldr_value)
             
-            # Make prediction
-            processed_value = predictor.process_data([[value]])
-            prediction = predictor.predict([processed_value[0]])[0]
+            value_placeholder.write(f"LDR Reading: {ldr_value:.2f}")
+            prob_placeholder.write(f"Tunneling Probability: {probability:.2%}")
+            progress_placeholder.progress(probability)
             
-            st.write(f"Tunneling Probability: {prediction:.2%}")
-            
-            # Visual representation using progress bar
-            st.progress(float(prediction))
+            time.sleep(1)  # Wait 1 second between readings
+        
+        st.write("Simulation complete!")
 
 if __name__ == "__main__":
     main()
+
