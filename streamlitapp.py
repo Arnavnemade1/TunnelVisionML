@@ -22,7 +22,6 @@ class QuantumTunnelingPredictor:
         return self.scaler.fit_transform(values)
     
     def predict(self, X):
-        # Returns probabilities between 0 and 1
         return self.model.predict_proba(X)[:, 1]
 
 def create_sample_data():
@@ -47,7 +46,7 @@ def main():
     st.sidebar.title("Controls")
     data_source = st.sidebar.radio(
         "Select Data Source",
-        ["Sample Data", "Upload CSV", "Single Value"]
+        ["Sample Data", "Single Value"]
     )
     
     if data_source == "Sample Data":
@@ -64,32 +63,6 @@ def main():
         fig = px.line(df, y=['ldr_value', 'predictions'], 
                      title='LDR Values and Tunneling Predictions')
         st.plotly_chart(fig)
-        
-    elif data_source == "Upload CSV":
-        uploaded_file = st.file_uploader("Upload CSV file", type=['csv'])
-        if uploaded_file:
-            try:
-                df = pd.read_csv(uploaded_file)
-                if 'ldr_value' not in df.columns:
-                    st.error("CSV must contain 'ldr_value' column")
-                else:
-                    st.write("Data Preview:")
-                    st.dataframe(df.head())
-                    
-                    processed_data = predictor.process_data(df)
-                    if 'tunneling' in df.columns:
-                        predictor.model.fit(processed_data, df['tunneling'])
-                    predictions = predictor.predict(processed_data)
-                    
-                    results_df = pd.DataFrame({
-                        'LDR Value': df['ldr_value'],
-                        'Tunneling Probability': predictions
-                    })
-                    st.write("Predictions:")
-                    st.dataframe(results_df)
-                    
-            except Exception as e:
-                st.error(f"Error processing file: {str(e)}")
                 
     else:  # Single Value
         value = st.number_input("Enter LDR value:", -10.0, 10.0, 0.0)
@@ -104,23 +77,6 @@ def main():
             prediction = predictor.predict([processed_value[0]])[0]
             
             st.write(f"Tunneling Probability: {prediction:.2%}")
-            
-            # Create gauge chart using plotly
-            import plotly.graph_objects as go
-            fig = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=prediction * 100,
-                title={'text': "Tunneling Probability (%)"},
-                gauge={
-                    'axis': {'range': [0, 100]},
-                    'bar': {'color': "darkblue"},
-                    'steps': [
-                        {'range': [0, 50], 'color': "lightgray"},
-                        {'range': [50, 100], 'color': "gray"}
-                    ]
-                }
-            ))
-            st.plotly_chart(fig)
 
 if __name__ == "__main__":
     main()
