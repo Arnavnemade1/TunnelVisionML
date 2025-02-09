@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
-import plotly.express as px
 
 class QuantumTunnelingPredictor:
     def __init__(self):
@@ -58,11 +57,9 @@ def main():
         predictor.model.fit(processed_data, df['tunneling'])
         predictions = predictor.predict(processed_data)
         
-        # Plotting
+        # Using streamlit's native plotting
         df['predictions'] = predictions
-        fig = px.line(df, y=['ldr_value', 'predictions'], 
-                     title='LDR Values and Tunneling Predictions')
-        st.plotly_chart(fig)
+        st.line_chart(df[['ldr_value', 'predictions']])
                 
     else:  # Single Value
         value = st.number_input("Enter LDR value:", -10.0, 10.0, 0.0)
@@ -77,6 +74,9 @@ def main():
             prediction = predictor.predict([processed_value[0]])[0]
             
             st.write(f"Tunneling Probability: {prediction:.2%}")
+            
+            # Visual representation using progress bar
+            st.progress(float(prediction))
 
 if __name__ == "__main__":
     main()
