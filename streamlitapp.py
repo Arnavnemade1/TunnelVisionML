@@ -1,53 +1,18 @@
 import pandas as pd
 import streamlit as st
 import plotly.express as px
-import numpy as np
 from sklearn.ensemble import RandomForestClassifier
+import plotly.graph_objects as go
 import math
 import random
+import numpy as np
 
 class QuantumTunnelingPredictor:
     def __init__(self):
         self.model = RandomForestClassifier(n_estimators=100, random_state=42)
     
-    def parse_experimental_data(self, text_data):
-        lines = text_data.split('\n')
-        data = []
-        barrier_data = []
-
-        for i, line in enumerate(lines):
-            try:
-                if 'LDR Value:' in line and '|' in line:
-                    parts = line.split('|')
-                    ldr_value = float(parts[0].split(':')[1].strip())
-                    threshold = float(parts[1].split(':')[1].strip())
-                    random_val = float(parts[2].split(':')[1].strip())
-                    probability = float(parts[3].split(':')[1].strip())
-                    tunneling = 'YES' if 'YES' in parts[4] else 'NO'
-
-                    data.append({
-                        'measurement_id': i,
-                        'ldr_value': ldr_value,
-                        'threshold': threshold,
-                        'random': random_val,
-                        'probability': probability,
-                        'tunneling': tunneling,
-                        'timestamp': pd.Timestamp.now() - pd.Timedelta(seconds=(len(data)))
-                    })
-                elif 'Barrier:' in line:
-                    barrier_count = line.count('#')
-                    dot_count = line.count('.')
-                    barrier_data.append({
-                        'measurement_id': len(barrier_data),
-                        'barrier_strength': barrier_count,
-                        'barrier_gaps': dot_count
-                    })
-            except Exception as e:
-                print(f"Error parsing line {i}: {e}")
-
-        return pd.DataFrame(data), pd.DataFrame(barrier_data)
-
     def simulate_tunneling(self, ldr_value):
+        """Simulate tunneling probability with enhanced physics modeling"""
         base_probability = (math.sin(ldr_value / 100) + 1) / 2
         noise = random.uniform(-0.1, 0.1)
         potential_barrier = math.exp(-ldr_value / 500)
@@ -55,41 +20,70 @@ class QuantumTunnelingPredictor:
         probability = max(0, min(1, (base_probability + noise) * potential_barrier * quantum_factor))
         return probability
 
-def create_heatmap(df):
-    if df.empty or 'ldr_value' not in df.columns or 'random' not in df.columns or 'probability' not in df.columns:
-        return go.Figure()  # Return an empty figure if data is missing
-
-    heatmap_data = df.pivot_table(
-        values='probability',
-        index=pd.qcut(df['ldr_value'], 10, duplicates='drop'),
-        columns=pd.qcut(df['random'], 10, duplicates='drop'),
-        aggfunc='mean'
-    )
-
-    return go.Figure(data=go.Heatmap(
-        z=heatmap_data.values,
-        x=np.arange(len(heatmap_data.columns)),
-        y=np.arange(len(heatmap_data.index)),
-        colorscale='Viridis',
-        colorbar=dict(title='Probability')
-    ))
-
 def main():
-    st.title("Quantum Tunneling Analyzer")
+    st.set_page_config(page_title="Quantum Tunneling Analyzer", layout="wide")
+    st.title("🌌 Enhanced Quantum Tunneling Analyzer")
+
+    # Sidebar Navigation
+    st.sidebar.title("Navigation")
+    mode = st.sidebar.radio("Select Mode", ["Upload Data", "Single Prediction", "Real-time Simulation", "Advanced Analytics"])
+    
     predictor = QuantumTunnelingPredictor()
 
-    uploaded_file = st.file_uploader("Upload data (TXT or CSV)", type=['txt', 'csv'])
-    if uploaded_file:
-        raw_data = uploaded_file.read().decode()
-        df, barrier_df = predictor.parse_experimental_data(raw_data)
+    if mode == "Single Prediction":
+        st.write("### 🔍 Single Value Prediction")
+        ldr_value = st.sidebar.slider("Enter LDR value", 0, 1023, 450)
 
-        if not df.empty:
-            st.write("## Data Preview")
-            st.dataframe(df.head())
+        if st.sidebar.button("Calculate Probability"):
+            probability = predictor.simulate_tunneling(ldr_value)
+            
+            fig = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=probability * 100,
+                title={'text': "Tunneling Probability"},
+                gauge={
+                    'axis': {'range': [0, 100]},
+                    'bar': {'color': "darkblue"},
+                    'steps': [
+                        {'range': [0, 30], 'color': "lightgray"},
+                        {'range': [30, 70], 'color': "gray"},
+                        {'range': [70, 100], 'color': "darkgray"}
+                    ]
+                }
+            ))
+            st.plotly_chart(fig)
 
-            st.write("## Heatmap")
-            heatmap_fig = create_heatmap(df)
-            st.plotly_chart(heatmap_fig)
+            # Barrier Visualization
+            barrier_length = 50
+            barrier_strength = int((1 - probability) * barrier_length)
+            barrier = '#' * barrier_strength + '.' * (barrier_length - barrier_strength)
+            st.code(f"Barrier: {barrier}", language=None)
+
+    elif mode == "Real-time Simulation":
+        st.write("### ⚡ Real-time Simulation")
+        chart_placeholder = st.empty()
+        data = []
+
+        if st.sidebar.button("Start Simulation"):
+            for _ in range(50):
+                ldr_value = random.uniform(0, 1023)
+                probability = predictor.simulate_tunneling(ldr_value)
+                data.append({
+                    'LDR Value': ldr_value,
+                    'Probability': probability,
+                    'Timestamp': len(data)
+                })
+                
+                df = pd.DataFrame(data)
+                fig = px.line(
+                    df, x="Timestamp", y="Probability",
+                    title="Real-time Quantum Tunneling Probability",
+                    labels={"Probability": "Tunneling Probability"}
+                )
+                chart_placeholder.plotly_chart(fig)
+
+    elif mode == "Advanced Analytics":
+        st.write("### 📈 Advanced Analytics Coming Soon!")
 
 if __name__ == "__main__":
     main()
