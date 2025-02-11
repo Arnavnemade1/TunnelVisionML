@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import streamlit as st
 import plotly.express as px
@@ -5,7 +6,7 @@ from sklearn.ensemble import RandomForestClassifier
 import plotly.graph_objects as go
 import math
 import random
-import numpy as np
+import time
 
 class QuantumTunnelingPredictor:
     def __init__(self):
@@ -22,21 +23,30 @@ class QuantumTunnelingPredictor:
 
 def main():
     st.set_page_config(page_title="Quantum Tunneling Analyzer", layout="wide")
-    st.title("🌌 Enhanced Quantum Tunneling Analyzer")
+    st.title("🌌 Quantum Tunneling Analyzer")
 
-    # Sidebar Navigation
+    # Sidebar for mode selection
     st.sidebar.title("Navigation")
-    mode = st.sidebar.radio("Select Mode", ["Upload Data", "Single Prediction", "Real-time Simulation", "Advanced Analytics"])
-    
+    mode = st.sidebar.radio("Select Mode", ["Upload Data", "Single Prediction", "Real-time Simulation"])
+
     predictor = QuantumTunnelingPredictor()
 
-    if mode == "Single Prediction":
+    if mode == "Upload Data":
+        st.write("### 📤 Upload Experimental Data")
+        uploaded_file = st.sidebar.file_uploader("Upload your experiment data (TXT)", type=['txt'])
+
+        if uploaded_file:
+            raw_data = uploaded_file.read().decode()
+            st.text("Data successfully loaded!")
+            st.code(raw_data[:500], language="plaintext")
+
+    elif mode == "Single Prediction":
         st.write("### 🔍 Single Value Prediction")
         ldr_value = st.sidebar.slider("Enter LDR value", 0, 1023, 450)
 
         if st.sidebar.button("Calculate Probability"):
             probability = predictor.simulate_tunneling(ldr_value)
-            
+
             fig = go.Figure(go.Indicator(
                 mode="gauge+number",
                 value=probability * 100,
@@ -59,7 +69,7 @@ def main():
             barrier = '#' * barrier_strength + '.' * (barrier_length - barrier_strength)
             st.code(f"Barrier: {barrier}", language=None)
 
-    elif mode == "Real-time Simulation":
+    else:  # Real-time Simulation
         st.write("### ⚡ Real-time Simulation")
         chart_placeholder = st.empty()
         data = []
@@ -73,17 +83,14 @@ def main():
                     'Probability': probability,
                     'Timestamp': len(data)
                 })
-                
+
                 df = pd.DataFrame(data)
                 fig = px.line(
                     df, x="Timestamp", y="Probability",
-                    title="Real-time Quantum Tunneling Probability",
-                    labels={"Probability": "Tunneling Probability"}
+                    title="Real-time Quantum Tunneling Probability"
                 )
                 chart_placeholder.plotly_chart(fig)
-
-    elif mode == "Advanced Analytics":
-        st.write("### 📈 Advanced Analytics Coming Soon!")
+                time.sleep(0.1)
 
 if __name__ == "__main__":
     main()
