@@ -16,131 +16,165 @@ class QuantumTunnelingPredictor:
         self.model = RandomForestClassifier(n_estimators=100, random_state=42)
         self.is_trained = False
     
-    def simulate_tunneling(self, ldr_value):
-        # Enhanced simulation with more realistic quantum behavior
-        base_probability = (math.sin(ldr_value) + 1) / 2
-        noise = random.uniform(-0.1, 0.1)
-        potential_barrier = math.exp(-ldr_value / 5)  # Simulate potential barrier effect
-        probability = max(0, min(1, (base_probability + noise) * potential_barrier))
-        return probability
-    
-    def prepare_data(self, ldr_values):
-        # Create features from LDR values
-        features = pd.DataFrame({
-            'ldr_value': ldr_values,
-            'potential_barrier': np.exp(-np.array(ldr_values) / 5),
-            'wave_component': np.sin(np.array(ldr_values))
-        })
-        return features
-    
-    def train(self, X, y):
-        self.model.fit(X, y)
-        self.is_trained = True
-    
-    def predict(self, X):
-        if not self.is_trained:
-            raise ValueError("Model needs to be trained first!")
-        return self.model.predict(X), self.model.predict_proba(X)
+    def parse_experimental_data(self, text_data):
+        """Parse the specific format of quantum tunneling data"""
+        lines = text_data.split('\n')
+        data = []
+        barrier_data = []
+        
+        for i, line in enumerate(lines):
+            if 'LDR Value:' in line and '|' in line:
+                # Parse measurement data
+                try:
+                    parts = line.split('|')
+                    ldr_value = float(parts[0].split(':')[1].strip())
+                    threshold = float(parts[1].split(':')[1].strip())
+                    random_val = float(parts[2].split(':')[1].strip())
+                    probability = float(parts[3].split(':')[1].strip())
+                    tunneling = 'YES' in parts[4] if len(parts) > 4 else 'NO'
+                    
+                    data.append({
+                        'measurement_id': i,
+                        'ldr_value': ldr_value,
+                        'threshold': threshold,
+                        'random': random_val,
+                        'probability': probability,
+                        'tunneling': tunneling
+                    })
+                except:
+                    continue
+            
+            # Parse barrier visualization
+            elif 'Barrier:' in line:
+                barrier = line.split(':')[1].strip()
+                barrier_count = barrier.count('#')
+                dot_count = barrier.count('.')
+                barrier_data.append({
+                    'measurement_id': len(barrier_data),
+                    'barrier_strength': barrier_count,
+                    'barrier_gaps': dot_count
+                })
+                
+        df = pd.DataFrame(data)
+        barrier_df = pd.DataFrame(barrier_data)
+        
+        return df, barrier_df
 
 def main():
-    st.title("🌌 Quantum Tunneling ML Predictor")
+    st.title("🌌 Quantum Tunneling Analyzer")
     st.write("""
-    ### Advanced Quantum Tunneling Analysis with Machine Learning
-    This application combines real LDR measurements with machine learning to predict quantum tunneling probability.
+    ### Experimental Data Visualization
+    Upload your quantum tunneling experiment data to visualize the results.
     """)
     
     predictor = QuantumTunnelingPredictor()
     
-    # Sidebar for mode selection
-    mode = st.sidebar.radio("Select Mode", ["Upload Data", "Single Prediction", "Real-time Simulation"])
+    # File upload
+    uploaded_file = st.file_uploader("Upload your experiment data (TXT)", type=['txt'])
     
-    if mode == "Upload Data":
-        st.write("### 📤 Upload Your Tunneling Data")
-        uploaded_file = st.file_uploader("Choose a CSV file with LDR values and tunneling outcomes", type="csv")
+    if uploaded_file is not None:
+        # Read and process data
+        raw_data = uploaded_file.read().decode()
+        df, barrier_df = predictor.parse_experimental_data(raw_data)
         
-        if uploaded_file is not None:
-            # Read and process uploaded data
-            data = pd.read_csv(uploaded_file)
-            st.write("### 📊 Data Preview")
-            st.write(data.head())
+        if not df.empty:
+            st.success(f"Successfully loaded {len(df)} measurements!")
             
-            if 'ldr_value' in data.columns and 'tunneled' in data.columns:
-                # Prepare and split data
-                X = predictor.prepare_data(data['ldr_value'])
-                y = data['tunneled']
-                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
-                
-                # Train model
-                predictor.train(X_train, y_train)
-                
-                # Make predictions on test set
-                y_pred, y_prob = predictor.predict(X_test)
-                accuracy = accuracy_score(y_test, y_pred)
-                
-                # Display results
-                st.write(f"### 🎯 Model Performance")
-                st.write(f"Test Accuracy: {accuracy:.2%}")
-                
-                # Plot results
-                fig = px.scatter(
-                    data_frame=pd.DataFrame({
-                        'LDR Value': X_test['ldr_value'],
-                        'Tunneling Probability': y_prob[:, 1],
-                        'Actual Outcome': y_test
-                    }),
-                    x='LDR Value',
-                    y='Tunneling Probability',
-                    color='Actual Outcome',
-                    title='Tunneling Probability vs LDR Value'
+            # Data Overview
+            st.header("📊 Data Overview")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Measurements", len(df))
+            with col2:
+                tunneling_count = df['tunneling'].value_counts().get('YES', 0)
+                tunneling_rate = (tunneling_count / len(df)) * 100
+                st.metric("Tunneling Events", f"{tunneling_count} ({tunneling_rate:.1f}%)")
+            with col3:
+                avg_ldr = df['ldr_value'].mean()
+                st.metric("Average LDR", f"{avg_ldr:.1f}")
+
+            # Main Experiment Visualization
+            st.header("📈 Quantum Tunneling Visualization")
+            
+            # Create combined visualization
+            fig = go.Figure()
+            
+            # Add LDR values
+            fig.add_trace(go.Scatter(
+                x=df['measurement_id'],
+                y=df['ldr_value'],
+                name='LDR Value',
+                mode='lines+markers',
+                line=dict(color='blue'),
+                marker=dict(
+                    size=8,
+                    color=df['tunneling'].map({'YES': 'red', 'NO': 'blue'})
                 )
-                st.plotly_chart(fig)
-            else:
-                st.error("Please ensure your CSV file has 'ldr_value' and 'tunneled' columns")
-            
-    elif mode == "Single Prediction":
-        st.write("### 🔍 Single Value Prediction")
-        ldr_value = st.slider("Enter LDR value", 0.0, 10.0, 5.0)
-        
-        if st.button("Calculate Probability"):
-            probability = predictor.simulate_tunneling(ldr_value)
-            
-            # Create gauge chart
-            fig = go.Figure(go.Indicator(
-                mode = "gauge+number",
-                value = probability * 100,
-                title = {'text': "Tunneling Probability"},
-                domain = {'x': [0, 1], 'y': [0, 1]},
-                gauge = {
-                    'axis': {'range': [0, 100]},
-                    'bar': {'color': "darkblue"},
-                    'steps': [
-                        {'range': [0, 30], 'color': "lightgray"},
-                        {'range': [30, 70], 'color': "gray"},
-                        {'range': [70, 100], 'color': "darkgray"}
-                    ]
-                }
             ))
+            
+            # Add threshold line
+            fig.add_trace(go.Scatter(
+                x=df['measurement_id'],
+                y=df['threshold'],
+                name='Threshold',
+                mode='lines',
+                line=dict(color='red', dash='dash')
+            ))
+            
+            # Add barrier strength visualization if available
+            if not barrier_df.empty:
+                fig.add_trace(go.Bar(
+                    x=barrier_df['measurement_id'],
+                    y=barrier_df['barrier_strength'],
+                    name='Barrier Strength',
+                    opacity=0.3,
+                    marker_color='gray'
+                ))
+            
+            fig.update_layout(
+                title="Quantum Tunneling Experiment Results",
+                xaxis_title="Measurement Index",
+                yaxis_title="Value",
+                height=600,
+                showlegend=True,
+                hovermode='x unified'
+            )
+            
             st.plotly_chart(fig)
-            
-    else:  # Real-time Simulation
-        st.write("### ⚡ Real-time Simulation")
-        chart_placeholder = st.empty()
-        data = []
-        
-        for _ in range(50):  # Simulate 50 readings
-            ldr_value = random.uniform(0, 10)
-            probability = predictor.simulate_tunneling(ldr_value)
-            data.append({'LDR Value': ldr_value, 'Probability': probability})
-            
-            # Update plot
-            df = pd.DataFrame(data)
-            fig = px.line(df, x=df.index, y='Probability', 
-                         title='Real-time Tunneling Probability',
-                         labels={'index': 'Time Step', 'Probability': 'Tunneling Probability'})
-            chart_placeholder.plotly_chart(fig)
-            
-            time.sleep(0.1)
+
+            # Probability Analysis
+            st.header("🎲 Tunneling Probability Analysis")
+            fig_prob = px.scatter(
+                df,
+                x='random',
+                y='probability',
+                color='tunneling',
+                title='Tunneling Probability vs Random Value',
+                labels={
+                    'random': 'Random Value',
+                    'probability': 'Tunneling Probability',
+                    'tunneling': 'Tunneling Occurred'
+                }
+            )
+            st.plotly_chart(fig_prob)
+
+            # Data Table
+            st.header("📋 Raw Data")
+            st.dataframe(df.style.highlight_max(axis=0))
+
+            # Export functionality
+            st.header("💾 Export Data")
+            if st.button("Export to CSV"):
+                csv = df.to_csv(index=False)
+                st.download_button(
+                    label="Download CSV",
+                    data=csv,
+                    file_name="tunneling_analysis.csv",
+                    mime="text/csv"
+                )
+
+        else:
+            st.error("Could not parse the data. Please check the file format.")
 
 if __name__ == "__main__":
     main()
-
