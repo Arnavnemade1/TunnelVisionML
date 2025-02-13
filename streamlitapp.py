@@ -14,6 +14,40 @@ from io import StringIO
 from scipy import stats
 import streamlit.components.v1 as components  # For custom HTML/CSS
 
+# Set page config
+st.set_page_config(page_title="Quantum Tunneling Analyzer", page_icon="🌌", layout="wide")
+
+# Custom CSS for styling
+st.markdown(
+    """
+    <style>
+    .stButton button {
+        background-color: #4CAF50;
+        color: white;
+        border-radius: 5px;
+        padding: 10px 20px;
+        font-size: 16px;
+    }
+    .stButton button:hover {
+        background-color: #45a049;
+    }
+    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+        color: #4CAF50;
+    }
+    .stMarkdown h1 {
+        font-size: 36px;
+    }
+    .stMarkdown h2 {
+        font-size: 28px;
+    }
+    .stMarkdown h3 {
+        font-size: 22px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 class QuantumTunnelingPredictor:
     def __init__(self):
         self.model = RandomForestClassifier(n_estimators=100, random_state=42)
@@ -127,9 +161,34 @@ def perform_statistical_tests(tunneling_data, no_tunneling_data):
     
     return results
 
-def main():
-    st.set_page_config(page_title="Quantum Tunneling Analyzer", page_icon="🌌", layout="wide")
+def generate_summary(stats_results):
+    """Generate a human-readable summary of the statistical test results"""
+    summary = ""
     
+    if stats_results.get('ks_test'):
+        ks_stat = stats_results['ks_test']['statistic']
+        ks_pval = stats_results['ks_test']['p_value']
+        
+        if ks_pval < 0.05:
+            summary += (
+                "📊 **Significant Difference Detected**:\n"
+                "The Kolmogorov-Smirnov test indicates a **statistically significant difference** "
+                f"(p-value = {ks_pval:.4f}) between the tunneling and no tunneling probability distributions. "
+                "This suggests that the two groups are likely drawn from different underlying distributions."
+            )
+        else:
+            summary += (
+                "📊 **No Significant Difference Detected**:\n"
+                "The Kolmogorov-Smirnov test does **not** indicate a statistically significant difference "
+                f"(p-value = {ks_pval:.4f}) between the tunneling and no tunneling probability distributions. "
+                "This suggests that the two groups may be drawn from similar underlying distributions."
+            )
+    else:
+        summary += "📊 **No Statistical Results Available**:\nUnable to generate a summary due to insufficient data."
+    
+    return summary
+
+def main():
     st.title("🌌 Enhanced Quantum Tunneling Analyzer")
     
     st.sidebar.title("Navigation")
@@ -272,6 +331,11 @@ def main():
                 - **Statistic**: `{stats_results['ks_test']['statistic']:.4f}`
                 - **P-value**: `{stats_results['ks_test']['p_value']:.4f}`
                 """)
+                
+                # Generate and display the summary
+                summary = generate_summary(stats_results)
+                st.markdown("### 📝 Summary of Findings")
+                st.markdown(summary)
 
 if __name__ == "__main__":
     main()
