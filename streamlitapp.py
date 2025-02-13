@@ -11,7 +11,7 @@ import math
 import random
 import time
 from io import StringIO
-from scipy import stats  # Ensure this import is present
+from scipy import stats
 
 class QuantumTunnelingPredictor:
     def __init__(self):
@@ -232,5 +232,4 @@ def main():
             
             with col2:
                 # Scatter plot
-                fig = px.scatter(df, x='ldr_value', y='probability', color='tunneling')
-                st.plotly
+                fig = px.scatter(df, x='ldr_value',
