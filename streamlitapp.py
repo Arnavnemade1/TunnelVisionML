@@ -232,4 +232,5 @@ def main():
             
             with col2:
                 # Scatter plot
-                fig = px.scatter(df, x='ldr_value', y='probability', color=df
+                fig = px.scatter(df, x='ldr_value', y='probability', color='tunneling')
+                st.plotly
