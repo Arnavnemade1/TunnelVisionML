@@ -12,6 +12,7 @@ import random
 import time
 from io import StringIO
 from scipy import stats
+import streamlit.components.v1 as components  # For custom HTML/CSS
 
 class QuantumTunnelingPredictor:
     def __init__(self):
@@ -127,6 +128,8 @@ def perform_statistical_tests(tunneling_data, no_tunneling_data):
     return results
 
 def main():
+    st.set_page_config(page_title="Quantum Tunneling Analyzer", page_icon="🌌", layout="wide")
+    
     st.title("🌌 Enhanced Quantum Tunneling Analyzer")
     
     st.sidebar.title("Navigation")
@@ -143,11 +146,12 @@ def main():
         uploaded_file = st.file_uploader("Upload your experiment data (TXT or CSV)", type=['txt', 'csv'])
         
         if uploaded_file is not None:
-            if uploaded_file.type == "text/csv":
-                df = pd.read_csv(uploaded_file)
-            else:
+            if uploaded_file.type == "text/plain":
                 raw_data = uploaded_file.read().decode()
                 df, barrier_df = predictor.parse_experimental_data(raw_data)
+            elif uploaded_file.type == "text/csv":
+                df = pd.read_csv(uploaded_file)
+                barrier_df = pd.DataFrame()  # Placeholder for CSV data
             
             if not df.empty:
                 st.header("📊 Data Overview")
@@ -162,18 +166,43 @@ def main():
                     name='LDR Value',
                     mode='lines+markers'
                 ))
-                st.plotly_chart(fig)
+                st.plotly_chart(fig, use_container_width=True)
 
     elif mode == "Single Prediction":
         st.write("### 🔍 Single Value Prediction")
-        ldr_value = st.slider("Enter LDR value", 0, 1023, 450)
+        
+        # Add a rotary wheel for LDR value selection
+        ldr_value = st.slider("Enter LDR value", 0, 1023, 450, key="ldr_slider")
+        
+        # Display the rotary wheel using HTML/CSS
+        components.html(
+            f"""
+            <style>
+            .wheel {{
+                width: 200px;
+                height: 200px;
+                border-radius: 50%;
+                background: conic-gradient(
+                    from 0deg,
+                    #ff7f50 0% {ldr_value / 1023 * 100}%,
+                    #ddd {ldr_value / 1023 * 100}% 100%
+                );
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 24px;
+                font-weight: bold;
+                color: #333;
+            }}
+            </style>
+            <div class="wheel">{ldr_value}</div>
+            """,
+            height=220,
+        )
         
         if st.button("Calculate"):
             probability = predictor.simulate_tunneling(ldr_value)
-            st.write(f"Tunneling Probability: {probability:.4f}")
-            
-            fig = go.Figure(data=[go.Pie(labels=["No Tunneling", "Tunneling"], values=[1 - probability, probability])])
-            st.plotly_chart(fig)
+            st.success(f"Tunneling Probability: **{probability:.4f}**")
 
     elif mode == "Real-time Simulation":
         st.write("### ⚡ Real-time Simulation")
@@ -192,7 +221,7 @@ def main():
                 
                 df = pd.DataFrame(data)
                 fig = px.line(df, x='time', y=['ldr_value', 'probability'])
-                chart_placeholder.plotly_chart(fig)
+                chart_placeholder.plotly_chart(fig, use_container_width=True)
                 time.sleep(0.1)
 
     else:  # Advanced Analytics
@@ -217,10 +246,6 @@ def main():
             tunneling_probs = df[df['tunneling']]['probability'].values
             no_tunneling_probs = df[~df['tunneling']]['probability'].values
             
-            # Debugging: Check the data
-            st.write("Tunneling probabilities sample:", tunneling_probs[:5])
-            st.write("No tunneling probabilities sample:", no_tunneling_probs[:5])
-            
             # Create visualizations
             col1, col2 = st.columns(2)
             
@@ -228,8 +253,25 @@ def main():
                 # Distribution plot
                 fig = create_distribution_plot(tunneling_probs, no_tunneling_probs)
                 if fig is not None:
-                    st.plotly_chart(fig)
+                    st.plotly_chart(fig, use_container_width=True)
             
             with col2:
                 # Scatter plot
-                fig = px.scatter(df, x='ldr_value',
+                fig = px.scatter(df, x='ldr_value', y='probability', color=df['tunneling'].astype(str))
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Statistical tests
+            st.subheader("📊 Statistical Analysis")
+            stats_results = perform_statistical_tests(tunneling_probs, no_tunneling_probs)
+            
+            if stats_results.get('ks_test'):
+                st.markdown("""
+                ### Kolmogorov-Smirnov Test Results
+                """)
+                st.markdown(f"""
+                - **Statistic**: `{stats_results['ks_test']['statistic']:.4f}`
+                - **P-value**: `{stats_results['ks_test']['p_value']:.4f}`
+                """)
+
+if __name__ == "__main__":
+    main()
