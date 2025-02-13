@@ -140,11 +140,14 @@ def main():
         Upload your quantum tunneling experiment data for advanced visualization and analysis.
         """)
         
-        uploaded_file = st.file_uploader("Upload your experiment data (TXT)", type=['txt'])
+        uploaded_file = st.file_uploader("Upload your experiment data (TXT or CSV)", type=['txt', 'csv'])
         
         if uploaded_file is not None:
-            raw_data = uploaded_file.read().decode()
-            df, barrier_df = predictor.parse_experimental_data(raw_data)
+            if uploaded_file.type == "text/csv":
+                df = pd.read_csv(uploaded_file)
+            else:
+                raw_data = uploaded_file.read().decode()
+                df, barrier_df = predictor.parse_experimental_data(raw_data)
             
             if not df.empty:
                 st.header("📊 Data Overview")
@@ -168,6 +171,9 @@ def main():
         if st.button("Calculate"):
             probability = predictor.simulate_tunneling(ldr_value)
             st.write(f"Tunneling Probability: {probability:.4f}")
+            
+            fig = go.Figure(data=[go.Pie(labels=["No Tunneling", "Tunneling"], values=[1 - probability, probability])])
+            st.plotly_chart(fig)
 
     elif mode == "Real-time Simulation":
         st.write("### ⚡ Real-time Simulation")
@@ -226,17 +232,4 @@ def main():
             
             with col2:
                 # Scatter plot
-                fig = px.scatter(df, x='ldr_value', y='probability', color=df['tunneling'].astype(str))
-                st.plotly_chart(fig)
-            
-            # Statistical tests
-            st.subheader("Statistical Analysis")
-            stats_results = perform_statistical_tests(tunneling_probs, no_tunneling_probs)
-            
-            if stats_results.get('ks_test'):
-                st.write("Kolmogorov-Smirnov Test Results:")
-                st.write(f"Statistic: {stats_results['ks_test']['statistic']:.4f}")
-                st.write(f"P-value: {stats_results['ks_test']['p_value']:.4f}")
-
-if __name__ == "__main__":
-    main()
+                fig = px.scatter(df, x='ldr_value', y='probability', color
