@@ -11,7 +11,7 @@ import math
 import random
 import time
 from io import StringIO
-from scipy import stats
+from scipy import stats  # Ensure this import is present
 
 class QuantumTunnelingPredictor:
     def __init__(self):
@@ -42,7 +42,8 @@ class QuantumTunnelingPredictor:
                         'probability': probability,
                         'tunneling': tunneling
                     })
-                except:
+                except Exception as e:
+                    st.warning(f"Skipping malformed line {i}: {line}. Error: {str(e)}")
                     continue
             
             elif 'Barrier:' in line:
@@ -59,28 +60,32 @@ class QuantumTunnelingPredictor:
     
     def simulate_tunneling(self, ldr_value):
         """Simulate tunneling probability with enhanced physics modeling"""
-        base_probability = (math.sin(ldr_value/100) + 1) / 2
+        base_probability = (math.sin(ldr_value / 100) + 1) / 2
         noise = random.uniform(-0.1, 0.1)
         potential_barrier = math.exp(-ldr_value / 500)
-        quantum_factor = 1 / (1 + math.exp(-(ldr_value - 500)/100))
+        quantum_factor = 1 / (1 + math.exp(-(ldr_value - 500) / 100))
         probability = max(0, min(1, (base_probability + noise) * potential_barrier * quantum_factor))
         return probability
 
 def create_heatmap(df):
     """Create a 2D heatmap of tunneling events"""
-    heatmap_data = df.pivot_table(
-        values='probability',
-        index=pd.qcut(df['ldr_value'], 10),
-        columns=pd.qcut(df['random'], 10),
-        aggfunc='mean'
-    )
-    return go.Figure(data=go.Heatmap(
-        z=heatmap_data.values,
-        x=np.arange(10),
-        y=np.arange(10),
-        colorscale='Viridis',
-        colorbar=dict(title='Probability')
-    ))
+    try:
+        heatmap_data = df.pivot_table(
+            values='probability',
+            index=pd.qcut(df['ldr_value'], 10),
+            columns=pd.qcut(df['random'], 10),
+            aggfunc='mean'
+        )
+        return go.Figure(data=go.Heatmap(
+            z=heatmap_data.values,
+            x=np.arange(10),
+            y=np.arange(10),
+            colorscale='Viridis',
+            colorbar=dict(title='Probability')
+        ))
+    except Exception as e:
+        st.error(f"Error creating heatmap: {str(e)}")
+        return None
 
 def create_distribution_plot(tunneling_data, no_tunneling_data):
     """Create a distribution plot for tunneling probabilities"""
@@ -94,11 +99,16 @@ def create_distribution_plot(tunneling_data, no_tunneling_data):
         except Exception as e:
             st.error(f"Error creating distribution plot: {str(e)}")
             return None
-    return None
+    else:
+        st.warning("Insufficient data for distribution plot. Ensure both tunneling and no tunneling data are available.")
+        return None
 
 def perform_statistical_tests(tunneling_data, no_tunneling_data):
     """Perform statistical tests on the data"""
     results = {}
+    
+    st.write(f"Tunneling data points: {len(tunneling_data)}")
+    st.write(f"No tunneling data points: {len(no_tunneling_data)}")
     
     if len(tunneling_data) > 0 and len(no_tunneling_data) > 0:
         try:
@@ -110,6 +120,9 @@ def perform_statistical_tests(tunneling_data, no_tunneling_data):
         except Exception as e:
             results['ks_test'] = None
             st.error(f"Error performing KS test: {str(e)}")
+    else:
+        results['ks_test'] = None
+        st.error("Insufficient data for statistical tests. Ensure both tunneling and no tunneling data are available.")
     
     return results
 
@@ -140,14 +153,12 @@ def main():
                 
                 # Main Visualization
                 fig = go.Figure()
-                
                 fig.add_trace(go.Scatter(
                     x=df['measurement_id'],
                     y=df['ldr_value'],
                     name='LDR Value',
                     mode='lines+markers'
                 ))
-                
                 st.plotly_chart(fig)
 
     elif mode == "Single Prediction":
@@ -199,6 +210,10 @@ def main():
             # Split data
             tunneling_probs = df[df['tunneling']]['probability'].values
             no_tunneling_probs = df[~df['tunneling']]['probability'].values
+            
+            # Debugging: Check the data
+            st.write("Tunneling probabilities sample:", tunneling_probs[:5])
+            st.write("No tunneling probabilities sample:", no_tunneling_probs[:5])
             
             # Create visualizations
             col1, col2 = st.columns(2)
